@@ -1,0 +1,5 @@
+troposphere
+awacs
+black>=24.4.0
+cfn-lint
+pipenv
