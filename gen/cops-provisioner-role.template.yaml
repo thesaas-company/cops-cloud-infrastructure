@@ -1,7 +1,18 @@
 Description: >-
   Cops Provisioner CloudFormation Template: This CloudFormation template is designed to create an admin IAM role specifically for Cops to trust. The purpose of this role is to enable Cops to provision the
   infrastructure required for its operations.
+Parameters:
+  AWSIntegrationID:
+    Description: Do not edit. This ID is used to provide secure access.
+    Type: String
 Resources:
+  CopsEventHandler:
+    Properties:
+      AWSIntegrationID: !Ref 'AWSIntegrationID'
+      AccountID: !Sub '${AWS::AccountId}'
+      CopsRoleArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
+      ServiceToken: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
+    Type: Custom::CopsEventHandler
   CopsProvisionerPermission:
     Properties:
       ManagedPolicyName: provisioner-policy-for-provisioner-role

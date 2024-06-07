@@ -1,6 +1,17 @@
 Description: "Cops Reader CloudFormation Template: This CloudFormation template is used to create a reader IAM role for Cops. The role's primary purpose is to grant read-only access to Cops resources. By\
   \ using this role, users will have the ability to view and retrieve information from Cops resources while maintaining strict restrictions on modifying or altering them. "
+Parameters:
+  AWSIntegrationID:
+    Description: Do not edit. This ID is used to provide secure access.
+    Type: String
 Resources:
+  CopsEventHandler:
+    Properties:
+      AWSIntegrationID: !Ref 'AWSIntegrationID'
+      AccountID: !Sub '${AWS::AccountId}'
+      CopsRoleArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
+      ServiceToken: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
+    Type: Custom::CopsEventHandler
   CopsReaderPermission:
     Properties:
       ManagedPolicyName: reader-policy-for-support-role

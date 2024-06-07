@@ -6,8 +6,7 @@ requirements:
 
 .PHONY: cf-lint
 cf-lint: requirements
-	cfn-lint ./cops-ai-admin/aws/gen/*.yaml
-	cfn-lint ./cops-ai-admin/aws/*.yaml
+	cfn-lint ./gen/*.yaml
 
 .PHONY: generate
 generate:

@@ -1,7 +1,18 @@
 Description: >-
   Cops Management CloudFormation Template: This CloudFormation template is responsible for creating a management IAM role that Cops will utilize. This role is intended for management purposes and does not
   grant permissions for creating, deleting, tagging, or untagging resources. Its purpose is to provide necessary access for efficiently managing Cops resources.
+Parameters:
+  AWSIntegrationID:
+    Description: Do not edit. This ID is used to provide secure access.
+    Type: String
 Resources:
+  CopsEventHandler:
+    Properties:
+      AWSIntegrationID: !Ref 'AWSIntegrationID'
+      AccountID: !Sub '${AWS::AccountId}'
+      CopsRoleArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
+      ServiceToken: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
+    Type: Custom::CopsEventHandler
   CopsReaderPermission:
     Properties:
       ManagedPolicyName: reader-policy-for-updater-role

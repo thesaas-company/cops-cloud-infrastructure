@@ -10,8 +10,9 @@ from awacs.aws import (
     StringEqualsIfExists,
 )
 from awacs.sts import AssumeRole
-from troposphere import Ref, Sub, Template
+from troposphere import Ref, Sub, Template, GetAtt, Parameter
 from troposphere.iam import ManagedPolicy, PolicyType, Role
+from troposphere.cloudformation import AWSCustomObject
 
 COPS_CONDITION = Condition(
     StringEqualsIfExists(
@@ -855,9 +856,38 @@ def create_role(name, policy_arn):
     )
 
 
+class CopsEventHandler(AWSCustomObject):
+    """
+    Custom resource for handling Cops events using a Lambda function.
+
+    Attributes:
+        resource_type (str): The type of the custom resource.
+        props (dict): The properties required by the custom resource.
+            - ServiceToken (str): The ARN of the Lambda function to invoke.
+            - CopsRoleArn (str): The ARN of the CopsRole to assume.
+            - AWSIntegrationID (str): The AWS Integration ID.
+            - AccountID (str): The AWS Account ID.
+    """
+    resource_type = "Custom::CopsEventHandler"
+    props = {
+        "ServiceToken": (str, True),
+        "CopsRoleArn": (str, True),
+        "AWSIntegrationID": (str, True),
+        "AccountID": (str, True)
+    }
+
+
 def main():
     for role in ["support", "updater", "provisioner"]:
         template = Template()
+
+        aws_integration_id_param = template.add_parameter(Parameter(
+            "AWSIntegrationID",
+            Type="String",
+            Description="Do not edit. This ID is used to provide secure access."
+        ))
+
+
         description = READER_CF_DESCRIPTION
         ref = [Ref(template.add_resource(create_read_policy(role)))]
 
@@ -873,6 +903,14 @@ def main():
             ref.append(Ref(template.add_resource(create_updater_policy(role))))
             ref.append(Ref(template.add_resource(create_terraform_policy(role))))
 
+        template.add_resource(CopsEventHandler(
+            "CopsEventHandler",
+            ServiceToken=Sub("arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler"),
+            CopsRoleArn=Sub("arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler"),
+            AWSIntegrationID=Ref(aws_integration_id_param),
+            AccountID=Sub("${AWS::AccountId}")
+        ))
+        
         template.set_description(description)
         file = f"cops-{role}"
 
