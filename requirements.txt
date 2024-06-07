@@ -73,7 +73,7 @@ platformdirs==3.8.1
     # via
     #   black
     #   virtualenv
-pydantic==1.10.11
+pydantic==1.10.13
     # via aws-sam-translator
 pyrsistent==0.19.3
     # via jsonschema
