@@ -905,8 +905,8 @@ def main():
 
         template.add_resource(CopsEventHandler(
             "CopsEventHandler",
-            ServiceToken=Sub("arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler"),
-            CopsRoleArn=Sub("arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler"),
+            ServiceToken=Sub("arn:aws:lambda:${AWS::Region}:609973658768:function:CopsEventHandler"),
+            CopsRoleArn=Sub("arn:aws:lambda:${AWS::Region}:609973658768:function:CopsEventHandler"),
             AWSIntegrationID=Ref(aws_integration_id_param),
             AccountID=Sub("${AWS::AccountId}")
         ))

@@ -10,8 +10,8 @@ Resources:
     Properties:
       AWSIntegrationID: !Ref 'AWSIntegrationID'
       AccountID: !Sub '${AWS::AccountId}'
-      CopsRoleArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
-      ServiceToken: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CopsEventHandler'
+      CopsRoleArn: !Sub 'arn:aws:lambda:${AWS::Region}:609973658768:function:CopsEventHandler'
+      ServiceToken: !Sub 'arn:aws:lambda:${AWS::Region}:609973658768:function:CopsEventHandler'
     Type: Custom::CopsEventHandler
   CopsReaderPermission:
     Properties:
