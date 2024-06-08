@@ -7,6 +7,7 @@ Parameters:
     Type: String
 Resources:
   CopsEventHandler:
+    DependsOn: CrossAccountRoleForAWSTrustedAdvisorCops
     Properties:
       AWSIntegrationID: !Ref 'AWSIntegrationID'
       AccountID: !Sub '${AWS::AccountId}'
