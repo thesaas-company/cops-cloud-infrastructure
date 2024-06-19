@@ -186,6 +186,73 @@ Resources:
               - '*'
         Version: '2012-10-17'
     Type: AWS::IAM::ManagedPolicy
+  CopsTerraformPermission:
+    Properties:
+      ManagedPolicyName: terraform-policy-for-updater-role
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:CreateBucket
+              - s3:DeleteBucket
+              - s3:PutEncryptionConfiguration
+              - s3:DeleteBucketPolicy
+              - s3:PutBucketPolicy
+              - s3:PutBucketTagging
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:PutBucketAcl
+              - s3:PutObjectAcl
+              - s3:PutBucketAcl
+              - s3:PutBucketLogging
+              - s3:PutBucketVersioning
+              - s3:PutBucketCORS
+              - s3:PutBucketLocation
+              - s3:PutReplicationConfiguration
+              - s3:PutBucketTagging
+              - s3:PutBucketOwnershipControls
+              - s3:PutBucketRequestPayment
+              - s3:PutLifecycleConfiguration
+              - s3:PutBucketObjectLockConfiguration
+              - s3:PutBucketPublicAccessBlock
+              - s3:DeleteObject
+              - s3:DeleteObjectVersion
+            Effect: Allow
+            Resource:
+              - arn:aws:s3:::cops-*
+              - arn:aws:s3:::cops-*/*
+              - arn:aws:s3:::cops-*
+              - arn:aws:s3:::cops-*/*
+          - Action:
+              - iam:CreateServiceLinkedRole
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/*.amazonaws.com/*'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/cops-*'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/Cops-*'
+          - Action:
+              - ec2:EnableEbsEncryptionByDefault
+              - ec2:ModifyEbsDefaultKmsKeyId
+              - ec2:DisableEbsEncryptionByDefault
+              - ec2:GetEbsEncryptionByDefault
+            Condition:
+              StringEqualsIfExists:
+                ec2:Region: !Sub '${AWS::Region}'
+            Effect: Allow
+            Resource:
+              - '*'
+          - Action:
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+              - dynamodb:CreateTable
+              - dynamodb:DeleteTable
+            Effect: Allow
+            Resource:
+              - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/cops-*'
+        Version: '2012-10-17'
+    Type: AWS::IAM::ManagedPolicy
   CopsUpdaterPermission:
     Properties:
       ManagedPolicyName: updater-policy-for-updater-role
@@ -276,5 +343,6 @@ Resources:
       ManagedPolicyArns:
         - !Ref 'CopsReaderPermission'
         - !Ref 'CopsUpdaterPermission'
+        - !Ref 'CopsTerraformPermission'
       RoleName: cops-updater
     Type: AWS::IAM::Role
