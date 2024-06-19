@@ -20,18 +20,18 @@ lint: requirements
 create-stack: requirements lint generate cf-lint
 	aws cloudformation create-stack \
 	  --output text \
-	  --stack-name copsai-provisioner-stack \
-	  --template-body file://./cops-ai-admin/aws/copsai-provisioner-role.template.yaml \
+	  --stack-name cops-provisioner-stack \
+	  --template-body file://./gen/cops-provisioner-role.template.yaml \
 	  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
 	aws cloudformation create-stack \
 	  --output text \
-	  --stack-name copsai-updater-stack \
-	  --template-body file://./cops-ai-admin/aws/copsai-updater-role.template.yaml \
+	  --stack-name cops-updater-stack \
+	  --template-body file://./gen/cops-updater-role.template.yaml \
 	  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
 	aws cloudformation create-stack \
 	  --output text \
-	  --stack-name copsai-support-stack \
-	  --template-body file://./cops-ai-admin/aws/copsai-support-role.template.yaml \
+	  --stack-name cops-support-stack \
+	  --template-body file://./gen/cops-support-role.template.yaml \
 	  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
 
 # RELEASE_TAG=v5.1.1 make release_cloudformation
@@ -44,7 +44,7 @@ release_cloudformation:
 	# Create directory for the new release
 	aws s3api put-object --bucket $(BUCKET_NAME) --key templates/$(RELEASE_TAG)/
 	# Upload the CloudFormation template to the new release directory
-	aws s3 cp ./cops-ai-admin/aws/gen/copsai-provisioner-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/copsai-provisioner-role.template.yaml
-	aws s3 cp ./cops-ai-admin/aws/gen/copsai-updater-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/copsai-updater-role.template.yaml
-	aws s3 cp ./cops-ai-admin/aws/gen/copsai-support-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/copsai-support-role.template.yaml
-	aws s3 cp ./cops-ai-admin/aws/cops-ai-admin-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/cops-ai-admin-role.template.yaml
+	aws s3 cp ./gen/cops-provisioner-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/cops-provisioner-role.template.yaml
+	aws s3 cp ./gen/cops-updater-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/cops-updater-role.template.yaml
+	aws s3 cp ./gen/cops-support-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/cops-support-role.template.yaml
+	aws s3 cp ./gen/cops-karpenter-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/cops-karpenter-role.template.yaml
