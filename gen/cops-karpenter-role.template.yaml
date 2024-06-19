@@ -1,9 +1,11 @@
-Description: >-
-  Cops Management CloudFormation Template: This CloudFormation template is responsible for creating a management IAM role that Cops will utilize. This role is intended for management purposes and does not
-  grant permissions for creating, deleting, tagging, or untagging resources. Its purpose is to provide necessary access for efficiently managing Cops resources.
+Description: "Cops Reader CloudFormation Template: This CloudFormation template is used to create a reader IAM role for Cops. The role's primary purpose is to grant read-only access to Cops resources. By\
+  \ using this role, users will have the ability to view and retrieve information from Cops resources while maintaining strict restrictions on modifying or altering them. "
 Parameters:
   AWSIntegrationID:
     Description: Do not edit. This ID is used to provide secure access.
+    Type: String
+  Cluster:
+    Description: Cluster Name
     Type: String
 Resources:
   CopsEventHandler:
@@ -16,7 +18,7 @@ Resources:
     Type: Custom::CopsEventHandler
   CopsReaderPermission:
     Properties:
-      ManagedPolicyName: reader-policy-for-updater-role
+      ManagedPolicyName: reader-policy-for-karpenter-role
       PolicyDocument:
         Statement:
           - Action:
@@ -186,83 +188,6 @@ Resources:
               - '*'
         Version: '2012-10-17'
     Type: AWS::IAM::ManagedPolicy
-  CopsUpdaterPermission:
-    Properties:
-      ManagedPolicyName: updater-policy-for-updater-role
-      PolicyDocument:
-        Statement:
-          - Action:
-              - ec2:ModifyVpcAttribute
-              - ec2:ModifyVpcEndpoint
-              - ec2:ModifySubnetAttribute
-              - ec2:ModifyLaunchTemplate
-            Condition:
-              StringEqualsIfExists:
-                aws:RequestTag/ManagedByCops: 'true'
-            Effect: Allow
-            Resource:
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:vpc-endpoint/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:internet-gateway/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:elastic-ip/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:natgateway/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:route-table/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/subnet-*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group-rule/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:vpc-flow-log/*'
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:vpc/*'
-          - Action:
-              - eks:UpdateNodegroupConfig
-              - eks:UpdateNodegroupVersion
-              - eks:UpdateClusterConfig
-              - eks:UpdateClusterVersion
-            Effect: Allow
-            Resource:
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/cops-*'
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:nodegroup/cops-*/cops-*/*'
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:nodegroup/cops-*'
-          - Action:
-              - autoscaling:UpdateAutoScalingGroup
-              - autoscaling:CreateOrUpdateTags
-              - autoscaling:DeleteTags
-            Condition:
-              StringEqualsIfExists:
-                aws:RequestTag/ManagedByCops: 'true'
-            Effect: Allow
-            Resource:
-              - '*'
-          - Action:
-              - eks:CreateNodegroup
-              - eks:TagResource
-              - eks:UntagResource
-              - eks:DeleteNodegroup
-            Effect: Allow
-            Resource:
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/cops-*'
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:nodegroup/cops-*/cops-*/*'
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:nodegroup/cops-*'
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:addon/cops-*/*/*'
-          - Action:
-              - eks:CreateAddon
-              - eks:UpdateAddon
-              - eks:DeleteAddon
-              - eks:DescribeAddonVersions
-              - eks:DescribeAddon
-              - eks:ListAddons
-            Effect: Allow
-            Resource:
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/cops-*'
-              - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:addon/cops-*/*/*'
-          - Action:
-              - ec2:CreateLaunchTemplate
-              - ec2:CreateLaunchTemplateVersion
-              - ec2:DeleteLaunchTemplate
-            Effect: Allow
-            Resource:
-              - '*'
-        Version: '2012-10-17'
-    Type: AWS::IAM::ManagedPolicy
   CrossAccountRoleForAWSTrustedAdvisorCops:
     Properties:
       AssumeRolePolicyDocument:
@@ -275,6 +200,5 @@ Resources:
         Version: '2012-10-17'
       ManagedPolicyArns:
         - !Ref 'CopsReaderPermission'
-        - !Ref 'CopsUpdaterPermission'
-      RoleName: cops-updater
+      RoleName: cops-karpenter
     Type: AWS::IAM::Role

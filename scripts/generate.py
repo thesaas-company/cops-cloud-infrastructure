@@ -8,10 +8,15 @@ from awacs.aws import (
     Principal,
     Statement,
     StringEqualsIfExists,
+    StringLikeIfExists
 )
 from awacs.sts import AssumeRole
 from troposphere import Ref, Sub, Template, GetAtt, Parameter
-from troposphere.iam import ManagedPolicy, PolicyType, Role
+from troposphere.iam import ManagedPolicy, PolicyType, Role, Policy
+from troposphere.sqs import Queue, QueuePolicy
+from troposphere.events import Rule
+
+
 from troposphere.cloudformation import AWSCustomObject
 
 COPS_CONDITION = Condition(
@@ -50,6 +55,13 @@ PROVISIONER_CF_DESCRIPTION = (
     "Cops to trust. The "
     "purpose of this role is to enable Cops to provision the infrastructure required for "
     "its operations."
+)
+
+KARPENTER_CF_DESCRIPTION= (
+    "Cops Karpenter CloudFormation Template: "
+    "This CloudFormation template is designed to create an admin IAM role specifically for "
+    "eks cluster to trust. The "
+    "purpose of this role is to enable karpenter"
 )
 
 
@@ -831,6 +843,302 @@ def create_terraform_policy(role_type):
         ),
     )
 
+def create_karpenter_policy(cluster_name):
+    """
+    Create a managed policy for the admin IAM role used by Terraform.
+    :return: The ManagedPolicy object.
+    """
+    return ManagedPolicy(
+        "KarpenterControllerPolicy",
+        ManagedPolicyName=f"KarpenterControllerPolicy-${cluster_name}",
+        PolicyDocument=PolicyDocument(
+            Version="2012-10-17",
+            Statement=[
+                # Statement(
+                #     Sid="AllowScopedEC2InstanceAccessActions",
+                #     Effect=Allow,
+                #     Action=[
+                #         "ec2:RunInstances",
+                #         "ec2:CreateFleet"
+                #     ],
+                #     Resource=[
+                #         Sub("arn:${AWS::Partition}:ec2:${AWS::Region}::image/*"),
+                #         Sub("arn:${AWS::Partition}:ec2:${AWS::Region}::snapshot/*"),
+                #         Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:security-group/*"),
+                #         Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:subnet/*")
+                #     ]
+                # ),
+                Statement(
+                    Sid="AllowScopedEC2LaunchTemplateAccessActions",
+                    Effect=Allow,
+                    Action=[
+                        Action("ec2","CreateFleet"),
+                        Action("ec2","RunInstances"),
+                    ],
+                    Resource=Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:launch-template/*"),
+                    Condition=Condition(
+                        #  StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                         StringLikeIfExists("aws:ResourceTag/karpenter.sh/nodepool",  "*")
+                    )
+                ),
+                Statement(
+                    Sid="AllowScopedEC2InstanceActionsWithTags",
+                    Effect=Allow,
+                    Action=[
+                        "ec2:RunInstances",
+                        "ec2:CreateFleet",
+                        "ec2:CreateLaunchTemplate"
+                    ],
+                    Resource=[
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:fleet/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:instance/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:volume/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:network-interface/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:launch-template/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:spot-instances-request/*")
+                    ],
+                    Condition=[
+                        Condition(
+                         StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                         StringLikeIfExists( "aws:ResourceTag/karpenter.sh/nodepool",  "*")
+                        ),
+                        Condition(
+                            StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                            StringLikeIfExists( "aws:ResourceTag/karpenter.sh/nodepool",  "*")
+                        )
+                    ]
+                ),
+                Statement(
+                    Sid="AllowScopedResourceCreationTagging",
+                    Effect=Allow,
+                    Action="ec2:CreateTags",
+                    Resource=[
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:fleet/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:instance/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:volume/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:network-interface/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:launch-template/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:spot-instances-request/*")
+                    ],
+                    Condition=Condition(
+                         StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                         StringEqualsIfExists("ec2:CreateAction",  [
+                                "RunInstances",
+                                "CreateFleet",
+                                "CreateLaunchTemplate"
+                            ]),
+                         StringLikeIfExists( "aws:ResourceTag/karpenter.sh/nodepool",  "*")
+                    )
+                 
+                ),
+                # Add other statements as needed
+                Statement(
+                    Sid="AllowScopedDeletion",
+                    Effect=Allow,
+                    Action=[
+                        "ec2:TerminateInstances",
+                        "ec2:DeleteLaunchTemplate"
+                    ],
+                    Resource=[
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:instance/*"),
+                        Sub("arn:${AWS::Partition}:ec2:${AWS::Region}:*:launch-template/*")
+                    ],
+                    Condition=Condition(
+                         StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                         StringLikeIfExists( "aws:ResourceTag/karpenter.sh/nodepool",  "*")
+                    )
+                ),
+                Statement(
+                    Sid="AllowRegionalReadActions",
+                    Effect=Allow,
+                    Action=[
+                        "ec2:DescribeAvailabilityZones",
+                        "ec2:DescribeImages",
+                        "ec2:DescribeInstances",
+                        "ec2:DescribeInstanceTypeOfferings",
+                        "ec2:DescribeInstanceTypes",
+                        "ec2:DescribeLaunchTemplates",
+                        "ec2:DescribeSecurityGroups",
+                        "ec2:DescribeSpotPriceHistory",
+                        "ec2:DescribeSubnets"
+                    ],
+                    Resource="*",
+                    Condition=Condition(
+
+                         StringLikeIfExists( "aws:RequestedRegion", "${AWS::Region}")
+                    )
+                ),
+                Statement(
+                    Sid="AllowSSMReadActions",
+                    Effect=Allow,
+                    Action="ssm:GetParameter",
+                    Resource=Sub("arn:${AWS::Partition}:ssm:${AWS::Region}::parameter/aws/service/*")
+                ),
+                Statement(
+                    Sid="AllowPricingReadActions",
+                    Effect=Allow,
+                    Action="pricing:GetProducts",
+                    Resource="*"
+                ),
+                # Add other read actions or specific permissions as needed
+                Statement(
+                    Sid="AllowInterruptionQueueActions",
+                    Effect=Allow,
+                    Action=[
+                        "sqs:DeleteMessage",
+                        "sqs:GetQueueUrl",
+                        "sqs:ReceiveMessage"
+                    ],
+                    Resource=GetAtt("KarpenterInterruptionQueue", "Arn")
+                ),
+                Statement(
+                    Sid="AllowPassingInstanceRole",
+                    Effect=Allow,
+                    Action="iam:PassRole",
+                    Resource=GetAtt("KarpenterNodeRole", "Arn"),
+                ),
+                # Add other IAM statements as required
+                Statement(
+                    Sid="AllowScopedInstanceProfileCreationActions",
+                    Effect=Allow,
+                    Action=[
+                        "iam:CreateInstanceProfile"
+                    ],
+                    Resource="*",
+                    Condition=Condition(
+                         StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                         StringLikeIfExists( "aws:ResourceTag/karpenter.sh/nodepool",  "*"),
+                          StringLikeIfExists( "aws:RequestedRegion", "${AWS::Region}")
+                    ),
+                ),
+                Statement(
+                    Sid="AllowScopedInstanceProfileTagActions",
+                    Effect=Allow,
+                    Action=[
+                        "iam:TagInstanceProfile"
+                    ],
+                    Resource="*",
+                    Condition=Condition(
+                         StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                         
+                          StringEqualsIfExists( "aws:RequestTag/topology.kubernetes.io/region", "${AWS::Region}"),
+                          StringLikeIfExists( "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass", "*")
+                    )
+
+                ),
+                Statement(
+                    Sid="AllowScopedInstanceProfileActions",
+                    Effect=Allow,
+                    Action=[
+                        "iam:AddRoleToInstanceProfile",
+                        "iam:RemoveRoleFromInstanceProfile",
+                        "iam:DeleteInstanceProfile"
+                    ],
+                    Resource="*",
+                    Condition=Condition(
+                         StringEqualsIfExists(f"aws:ResourceTag/kubernetes.io/cluster/${cluster_name}",  "owned"),
+                         
+                          StringEqualsIfExists( "aws:RequestTag/topology.kubernetes.io/region", "${AWS::Region}"),
+                          StringLikeIfExists( "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass", "*")
+                    )
+
+                ),
+                Statement(
+                    Sid="AllowIAMPassRole",
+                    Effect=Allow,
+                    Action="iam:PassRole",
+                    Resource=GetAtt("KarpenterNodeRole", "Arn"),
+                    Condition=Condition(
+                         StringEqualsIfExists("iam:PassedToService",  "ec2.amazonaws.com"),
+                    )
+
+                )
+            ]
+        )
+    )
+
+def create_queue_policy(cluster_name):
+    return Queue(
+        "KarpenterInterruptionQueue",
+        QueueName=Sub("${cluster_name}"),
+        MessageRetentionPeriod=300,
+        KmsMasterKeyId="kms_key",
+        SqsManagedSseEnabled=True
+    )
+
+
+def create_interruption_policy():
+    return QueuePolicy(
+        "KarpenterInterruptionQueuePolicy",
+        Queues=[Ref("KarpenterInterruptionQueue")],
+        PolicyDocument={
+            "Id": "EC2InterruptionPolicy",
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"Service": ["events.amazonaws.com", "sqs.amazonaws.com"]},
+                    "Action": "sqs:SendMessage",
+                    "Resource": GetAtt("KarpenterInterruptionQueue", "Arn")
+                }
+            ]
+        }
+    )
+
+
+def create_schedule_rule():
+    return Rule(
+        "ScheduledChangeRule",
+        EventPattern={
+            "source": ["aws.health"],
+            "detail-type": ["AWS Health Event"]
+        },
+        Targets=[{
+            "Id": "KarpenterInterruptionQueueTarget",
+            "Arn": GetAtt("KarpenterInterruptionQueue", "Arn")
+        }]
+    )
+
+def create_spot_rule():
+    return Rule(
+        "SpotInterruptionRule",
+        EventPattern={
+            "source": ["aws.ec2"],
+            "detail-type": ["EC2 Spot Instance Interruption Warning"]
+        },
+        Targets=[{
+            "Id": "KarpenterInterruptionQueueTarget",
+            "Arn": GetAtt("KarpenterInterruptionQueue", "Arn")
+        }]
+    )
+
+def create_rebalance_rule():
+    return Rule(
+        "RebalanceRule",
+        EventPattern={
+            "source": ["aws.ec2"],
+            "detail-type": ["EC2 Instance Rebalance Recommendation"]
+        },
+        Targets=[{
+            "Id": "KarpenterInterruptionQueueTarget",
+            "Arn": GetAtt("KarpenterInterruptionQueue", "Arn")
+        }]
+    )
+
+
+def create_statechange_rule():
+    return Rule(
+        "InstanceStateChangeRule",
+        EventPattern={
+            "source": ["aws.ec2"],
+            "detail-type": ["EC2 Instance State-change Notification"]
+        },
+        Targets=[{
+            "Id": "KarpenterInterruptionQueueTarget",
+            "Arn": GetAtt("KarpenterInterruptionQueue", "Arn")
+        }]
+    )
+
 
 def create_role(name, policy_arn):
     """
@@ -853,6 +1161,35 @@ def create_role(name, policy_arn):
             ],
         ),
         ManagedPolicyArns=policy_arn,
+    )
+
+def create_karpenter_role(cluster_name):
+    """
+    Create a managed policy for the IAM role.
+    :param name: The name of the IAM role.
+    :param policy_arn: The list of policy ARNs.
+    :return: The Role object.
+    """
+    return Role(
+         "KarpenterNodeRole",
+        RoleName=Sub("KarpenterNodeRole-${cluster_name}"),
+       
+        AssumeRolePolicyDocument=PolicyDocument(
+            Version="2012-10-17",
+            Statement=[
+                Statement(
+                    Effect=Allow,
+                    Action=[AssumeRole],
+                    Principal=Principal("Service", [Sub("ec2.${AWS::URLSuffix}")])
+                )
+            ],
+        ),
+        ManagedPolicyArns=[
+                Sub("arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"),
+                Sub("arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"),
+                Sub("arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"),
+                Sub("arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore")
+            ],
     )
 
 
@@ -887,7 +1224,6 @@ def main():
             Description="Do not edit. This ID is used to provide secure access."
         ))
 
-
         description = READER_CF_DESCRIPTION
         ref = [Ref(template.add_resource(create_read_policy(role)))]
 
@@ -901,8 +1237,8 @@ def main():
         # This permission is required by Terraform for update/upgrade
         if role == "updater" or role == "provisioner":
             ref.append(Ref(template.add_resource(create_updater_policy(role))))
-            ref.append(Ref(template.add_resource(create_terraform_policy(role))))
 
+            
         template.add_resource(CopsEventHandler(
             "CopsEventHandler",
             ServiceToken=Sub("arn:aws:lambda:${AWS::Region}:609973658768:function:CopsEventHandler"),
@@ -922,7 +1258,36 @@ def main():
 
         with open(path, "w") as file:
             file.write(template.to_yaml())
+    template = Template()
+    ref = []
 
+    cluster_name = template.add_parameter(Parameter(
+        "Cluster",
+        Type="String",
+        Description="Do not edit. This ID is used to provide secure access."
+    ))
+
+    ref.append(Ref(template.add_resource(create_karpenter_policy(cluster_name))))
+    ref.append(Ref(template.add_resource(create_interruption_policy())))
+    ref.append(Ref(template.add_resource(create_queue_policy())))
+    ref.append(Ref(template.add_resource(create_schedule_rule())))
+    ref.append(Ref(template.add_resource(create_rebalance_rule())))
+    ref.append(Ref(template.add_resource(create_statechange_rule())))
+    ref.append(Ref(template.add_resource(create_spot_rule())))
+
+    description = KARPENTER_CF_DESCRIPTION
+
+
+    template.set_description(description)
+    file = "cops-karpenter-role.template.yaml"
+
+    template.add_resource(create_karpenter_role(ref))
+
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(parent_dir, "gen", "cops-karpenter-role.template.yaml")
+
+    with open(path, "w") as file:
+        file.write(template.to_yaml())
 
 if __name__ == "__main__":
     main()
