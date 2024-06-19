@@ -47,4 +47,4 @@ release_cloudformation:
 	aws s3 cp ./cops-ai-admin/aws/gen/copsai-provisioner-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/copsai-provisioner-role.template.yaml
 	aws s3 cp ./cops-ai-admin/aws/gen/copsai-updater-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/copsai-updater-role.template.yaml
 	aws s3 cp ./cops-ai-admin/aws/gen/copsai-support-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/copsai-support-role.template.yaml
-	aws s3 cp ./cops-ai-admin/aws/cops-ai-admin-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/cops-ai-admin-role.template.yaml
+	aws s3 cp ./cops-ai-admin/aws/cops-karpenter-role.template.yaml s3://$(BUCKET_NAME)/templates/$(RELEASE_TAG)/cops-karpenter-role.template.yaml
